@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>openlayersと国土地理院道路</title>
+  <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.10.0/build/ol.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.10.0/css/ol.css">
+  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+</head>
+
+<body>
+<div id="map" style="position:absolute;top:0;left:0;bottom:0;right:0;"></div>
+<script>
+  const source = new ol.source.VectorTile({
+    format: new ol.format.MVT({
+      layers: ['road']
+    }),
+    url: 'https://cyberjapandata.gsi.go.jp/xyz/experimental_bvmap/{z}/{x}/{y}.pbf',
+    attributions: [
+      '<a href="https://github.com/gsi-cyberjapan/gsimaps-vector-experiment" target="_blank" rel=”noopener noreferrer”>国土地理院</a>'
+    ]
+  })
+  const vectorLayer = new ol.layer.VectorTile({
+    source:source,
+    style: roadStyle
+  });
+
+  const baseMap = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    })
+  })
+
+  const map = new ol.Map({
+    target: 'map',
+    view: new ol.View({
+      center: ol.proj.fromLonLat([140.46, 36.37]),
+      zoom: 16
+    }),
+    layers: [baseMap,vectorLayer]
+  });
+
+  // source.on('tileloadend', function (tileSourceEvent) {
+  //   const features = tileSourceEvent.tile.features_
+  //   features.forEach(feature=>{
+  // })
+  // });
+
+  function roadStyle(feature, resolution) {
+    const properties = feature.getProperties();
+    if (properties.layer === 'road') {
+      if(feature.getType() == "LineString"){
+        const coordinates = feature.getFlatCoordinates()
+        const length = coordinates.length
+        const head = ol.proj.transform([coordinates[0],coordinates[1]],'EPSG:3857', 'EPSG:4326')
+        const tail = ol.proj.transform([coordinates[length-2],coordinates[length-1]],'EPSG:3857', 'EPSG:4326')
+        let bearing = turf.bearing(head, tail);
+        if (bearing < 0) bearing += 180;
+        if (bearing > 90) bearing -= 90;
+        return new ol.style.Style({
+          stroke: new ol.style.Stroke({ //Polylineも使ってみたい
+            color: `hsl(${45 - bearing*4},90%,45%)`,
+            width: 4 //4ぐらいがちょうどよい気がする。
+          }),
+          zIndex: 1
+        });
+      }
+      return new ol.style.Style();
+    } else {
+      return new ol.style.Style();
+    }
+  }
+</script>
+</body>
+</html>
+
